@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_const_literals_to_create_immutables
+
 import 'dart:developer';
 import 'dart:io';
 
@@ -5,6 +7,8 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:qr_code_scanner/qr_code_scanner.dart';
+import 'package:sm/Master/Global.dart';
+import 'package:sm/Scanner/Results.dart';
 
 class QrReader extends StatefulWidget {
   const QrReader({Key? key}) : super(key: key);
@@ -29,112 +33,66 @@ class _QrReaderState extends State<QrReader> {
     controller!.resumeCamera();
   }
 
+  bool flash = false;
+  bool toggleBtn = false;
+  void changeAction(bool param) async {
+    if (param) {
+      await controller?.pauseCamera();
+    } else {
+      await controller?.resumeCamera();
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
   @override
   Widget build(BuildContext context) {
+    // ignore: unused_local_variable
+    Size frame = MediaQuery.of(context).size;
+    /***Navigates to the next page when data is scanned */
     return Scaffold(
       floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       floatingActionButton: FloatingActionButton(
-        child: const Icon(Icons.arrow_back_ios_new_rounded),
+        child: const Icon(Icons.settings),
         onPressed: () {
-          Navigator.pop(context);
+          showCupertinoModalPopup(
+              context: context,
+              builder: (context) {
+                // ignore: avoid_unnecessary_containers
+                return BottomSheet(
+                    backgroundColor: Colors.transparent,
+                    clipBehavior: Clip.antiAlias,
+                    enableDrag: true,
+                    onClosing: () {},
+                    builder: (context) => bottomAction(context));
+              });
         },
       ),
-      body: Column(
+      body: Stack(
         children: <Widget>[
-          Expanded(flex: 4, child: _buildQrView(context)),
-          Expanded(
-            flex: 1,
-            child: FittedBox(
-              fit: BoxFit.contain,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: <Widget>[
-                  if (result != null)
-                    // CupertinoModalPopupRoute(builder: (context){
-                    Center(
-                      child: Text(
-                          'Barcode Type: ${describeEnum(result!.format)} Data: ${result!.code}'),
-                    )
-
-                  // }),
-                  // bottomAction(context),
-                  else
-                    Text(
-                      'Scan a code....',
-                      style: Theme.of(context).textTheme.headline5!.copyWith(
-                            fontSize: 20,
-                          ),
-                    ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: <Widget>[
-                      Container(
-                        margin: const EdgeInsets.all(8),
-                        child: ElevatedButton(
-                            onPressed: () async {
-                              await controller?.toggleFlash();
-                              setState(() {});
-                            },
-                            child: FutureBuilder(
-                              future: controller?.getFlashStatus(),
-                              builder: (context, snapshot) {
-                                return Text('Flash: ${snapshot.data}');
-                              },
-                            )),
-                      ),
-                      Container(
-                        margin: const EdgeInsets.all(8),
-                        child: ElevatedButton(
-                            onPressed: () async {
-                              await controller?.flipCamera();
-                              setState(() {});
-                            },
-                            child: FutureBuilder(
-                              future: controller?.getCameraInfo(),
-                              builder: (context, snapshot) {
-                                if (snapshot.data != null) {
-                                  return Text(
-                                      'Camera facing ${describeEnum(snapshot.data!)}');
-                                } else {
-                                  return const CircularProgressIndicator
-                                      .adaptive();
-                                }
-                              },
-                            )),
-                      )
-                    ],
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: <Widget>[
-                      Container(
-                        margin: const EdgeInsets.all(8),
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            await controller?.pauseCamera();
-                          },
-                          child: const Text('pause',
-                              style: TextStyle(fontSize: 20)),
-                        ),
-                      ),
-                      Container(
-                        margin: const EdgeInsets.all(8),
-                        child: ElevatedButton(
-                          onPressed: () async {
-                            await controller?.resumeCamera();
-                          },
-                          child: const Text('resume',
-                              style: TextStyle(fontSize: 20)),
-                        ),
-                      )
-                    ],
-                  ),
-                ],
+          Expanded(flex: 9, child: _buildQrView(context)),
+          Positioned(
+            bottom: frame.height / 5,
+            left: frame.width / 2.3,
+            child: CircleAvatar(
+              radius: 33,
+              child: IconButton(
+                iconSize: 30,
+                onPressed: () {
+                  setState(() {
+                    toggleBtn = !toggleBtn;
+                    changeAction(toggleBtn);
+                  });
+                },
+                icon: Icon(
+                  toggleBtn == false ? Icons.pause : Icons.play_arrow_rounded,
+                ),
               ),
             ),
-          )
+          ),
         ],
       ),
     );
@@ -144,8 +102,8 @@ class _QrReaderState extends State<QrReader> {
     // For this example we check how width or tall the device is and change the scanArea and overlay accordingly.
     var scanArea = (MediaQuery.of(context).size.width < 400 ||
             MediaQuery.of(context).size.height < 400)
-        ? 150.0
-        : 300.0;
+        ? 250.0
+        : 350.0;
     // To ensure the Scanner view is properly sizes after rotation
     // we need to listen for Flutter SizeChanged notification and update controller
     return QRView(
@@ -154,7 +112,7 @@ class _QrReaderState extends State<QrReader> {
       overlay: QrScannerOverlayShape(
           borderColor: Colors.green,
           borderRadius: 10,
-          borderLength: 30,
+          borderLength: 10,
           borderWidth: 10,
           cutOutSize: scanArea),
       onPermissionSet: (ctrl, p) => _onPermissionSet(context, ctrl, p),
@@ -163,12 +121,24 @@ class _QrReaderState extends State<QrReader> {
 
   void _onQRViewCreated(QRViewController controller) {
     setState(() {
-      this.controller = controller;
+      controller = controller;
     });
     controller.scannedDataStream.listen((scanData) {
-      setState(() {
-        result = scanData;
-      });
+      // ignore: unnecessary_null_comparison
+      if (scanData != null) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => Results(
+              data: '${scanData.code}',
+            ),
+            fullscreenDialog: true,
+          ),
+        );
+        changeAction(true);
+      }
+
+      setState(() {});
     });
   }
 
@@ -181,13 +151,62 @@ class _QrReaderState extends State<QrReader> {
     }
   }
 
-// void bottomAction(BuildContext context){
-//   showCupertinoModalPopup(context: context, builder: (context){
-//     return BottomSheet(onClosing: (){}, builder: (context){
-//       // ignore: avoid_unnecessary_containers
-//     },);
-//   },);
-// }
+  Widget bottomAction(BuildContext context) {
+    // ignore: avoid_unnecessary_containers
+    return Container(
+      height: MediaQuery.of(context).size.height / 3,
+      // ignore: prefer_const_constructors
+      decoration: BoxDecoration(
+        color: Colors.white,
+        // ignore: prefer_const_constructors
+        borderRadius: BorderRadius.only(
+          topLeft: const Radius.circular(50),
+          topRight: const Radius.circular(50),
+        ),
+      ),
+      child: ListView(
+        children: [
+          ListTile(
+            leading: const Icon(Icons.flash_on_rounded),
+            title: FutureBuilder(
+              future: controller?.getFlashStatus(),
+              builder: (context, snapshot) {
+                return const Text('Flash light');
+              },
+            ),
+            onTap: () async {
+              await controller?.toggleFlash();
+              Navigator.pop(context);
+              setState(() {
+                flash = !flash;
+              });
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text(flash ? 'Flash on' : "Flash off")),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.camera),
+            title: FutureBuilder(
+              future: controller?.getCameraInfo(),
+              builder: (context, snapshot) {
+                if (snapshot.data != null) {
+                  return Text('Camera facing ${describeEnum(snapshot.data!)}');
+                } else {
+                  return const CircularProgressIndicator.adaptive();
+                }
+              },
+            ),
+            onTap: () async {
+              await controller?.flipCamera();
+              setState(() {});
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   void dispose() {
     controller?.dispose();
